@@ -84,5 +84,6 @@ int clk_main() {
         }
         refresh();
     }
+    endwin();
     return 0;
 }
