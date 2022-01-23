@@ -20,11 +20,11 @@ int cur_main() {
     int ch;
     init();
 
-    while(ch != KEY_F(2)) {
-        ch = getch();
-		printw("%c", ch);
-        refresh();
-    }
+    // while(ch != KEY_F(2)) {
+    //     ch = getch();
+	// 	printw("%c", ch);
+    //     refresh();
+    // }
 
 	endwin();
 	return 0;

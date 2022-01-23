@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "cur.c"
+//#include "cur.c"
 #include "clock.c"
 
 int main(int argc, const char* argv[]) {
