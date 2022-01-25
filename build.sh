@@ -1,1 +1,1 @@
-gcc main.c -lncurses && ./a.out
+gcc main.c -lncurses -lrtmidi && ./a.out
