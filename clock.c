@@ -6,32 +6,60 @@
 
 RtMidiOutPtr out_ptr;
 unsigned char msg[3] = {0x90, 0x3c, 0x40};
+unsigned char msg_off[3] = {0x80, 0x3c, 0x00};
 int i = 0;
 int bpm = 60;
 int key = '-';
+int cursor_x = 0;
+int cursor_y = 3;
 int signature = 4; // quarter notes per beat
+int timer_reset = 0;
 dispatch_queue_t queue;
 dispatch_source_t timer1;
 
 void send_midi_note() {
   int retval = rtmidi_out_send_message(out_ptr, msg , 3);
 }
+void send_midi_note_off() {
+  int retval = rtmidi_out_send_message(out_ptr, msg_off , 3);
+}
 
 unsigned long long int bpm_to_usec(int bpm) {
     return (NSEC_PER_SEC * 60) / bpm;
 }
 
-int notes[] = {0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int notes[][16] = {
+    { 1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 },
+    { 0,0,0,0, 1,0,0,0, 1,0,0,0, 0,0,0,0 },
+    { 0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0 },
+    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0 }
+};
 
 void draw_grid(int loc) {
-    send_midi_note();
+    if(notes[0][loc] != 0) {
+        send_midi_note();
+        send_midi_note_off();
+    }
     erase();
     printw("bpm: %i\n", bpm);
     printw("key: %c\n", key);
     printw("================\n");
-    printw("%i%i\n", notes[0], notes[1]);
+    for(int k = 0; k < 4; k++) {
+        for(int j = 0; j < 16; j++) {
+            printw("%i", notes[k][j]);
+        }
+        printw("\n");
+    }
     printw("================\n");
-    mvaddstr(2, loc, "*");
+    attron(A_REVERSE);
+    mvaddch(3, loc, '0' + notes[0][loc]);
+    attroff(A_REVERSE);
+    move(cursor_y, cursor_x);
+    if(timer_reset != 0) {
+        dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, bpm_to_usec(bpm)/signature);
+        dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
+        timer_reset = 0;
+    }
 }
 
 void init_midi() {
@@ -53,10 +81,12 @@ void init_midi() {
 
 extern void init() {
 	initscr();
-    curs_set(0);
+    // curs_set(0);
+    move(cursor_y, cursor_x);
 	raw();
 	keypad(stdscr, TRUE);
 	noecho();
+    refresh();
 }
 
 void sigtrap(int sig)
@@ -94,7 +124,7 @@ int clk_main() {
         refresh();
         exit(0);
     });
-    dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0); // after 1 sec
+    dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
 
     // Set timer
     dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
@@ -106,15 +136,31 @@ int clk_main() {
         key = ch;
         if(ch == 'j') {
             bpm--;
+            // https://stackoverflow.com/questions/28863974/dispatch-after-with-a-sliding-or-resettable-delay
+            // modifying bpm instantly resets timer
+            timer_reset = 1;
         }
         else if(ch == 'k') {
             bpm++;
+            timer_reset = 1;
         }
         else if(ch == 'p') {
             dispatch_resume(timer1);
         }
         else if(ch == 's') {
             dispatch_suspend(timer1);
+        }
+        else if(ch == 'h') {
+            cursor_x = cursor_x == 0 ? 0 : cursor_x - 1;
+            move(cursor_y, cursor_x);
+        }
+        else if(ch == 'l') {
+            cursor_x = cursor_x == 15 ? 15 : cursor_x + 1;
+            move(cursor_y, cursor_x);
+        }
+        else if(ch == 'x') {
+            notes[0][cursor_x] = !notes[0][cursor_x];
+            draw_grid(i%16);
         }
         refresh();
     }
