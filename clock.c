@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ncurses.h>
-#include <rtmidi_c.h>
+#include <rtmidi/rtmidi_c.h>
 
 RtMidiOutPtr out_ptr;
 unsigned char msg[3] = {0x90, 0x3c, 0x40};
