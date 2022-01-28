@@ -21,3 +21,5 @@ GCD grand central dispatch, should be installed already.
 brew install rtmidi
 brew install ncurses
 
+# cross compile
+https://stackoverflow.com/questions/44389963/how-to-install-mingw32-on-ubuntu
