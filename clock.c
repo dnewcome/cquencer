@@ -14,6 +14,7 @@ int cursor_x = 0;
 int cursor_y = 3;
 int signature = 4; // quarter notes per beat
 int timer_reset = 0;
+int running = 0;
 dispatch_queue_t queue;
 dispatch_source_t timer1;
 
@@ -35,16 +36,21 @@ int notes[][16] = {
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0 }
 };
 
+int tracks[] = {1,2,3,4};
+int tracks_len = 4;
+
 void draw_grid(int loc) {
-    if(notes[0][loc] != 0) {
-        send_midi_note();
-        send_midi_note_off();
+    for(int t = 0; t < tracks_len; t++) {
+        if(notes[t][loc] != 0) {
+            send_midi_note();
+            send_midi_note_off();
+        }
     }
     erase();
     printw("bpm: %i\n", bpm);
     printw("key: %c\n", key);
     printw("================\n");
-    for(int k = 0; k < 4; k++) {
+    for(int k = 0; k < tracks_len; k++) {
         for(int j = 0; j < 16; j++) {
             printw("%i", notes[k][j]);
         }
@@ -52,7 +58,7 @@ void draw_grid(int loc) {
     }
     printw("================\n");
     attron(A_REVERSE);
-    mvaddch(3, loc, '0' + notes[0][loc]);
+    mvaddch(2, loc, '=');
     attroff(A_REVERSE);
     move(cursor_y, cursor_x);
     if(timer_reset != 0) {
@@ -134,21 +140,23 @@ int clk_main() {
     while(ch != KEY_F(2) && ch != 'q') {
         ch = getch();
         key = ch;
-        if(ch == 'j') {
+        if(ch == '-') {
             bpm--;
-            // https://stackoverflow.com/questions/28863974/dispatch-after-with-a-sliding-or-resettable-delay
-            // modifying bpm instantly resets timer
             timer_reset = 1;
         }
-        else if(ch == 'k') {
+        else if(ch == '+') {
             bpm++;
             timer_reset = 1;
         }
-        else if(ch == 'p') {
-            dispatch_resume(timer1);
-        }
-        else if(ch == 's') {
-            dispatch_suspend(timer1);
+        else if(ch == ' ') {
+            if(running) {
+                dispatch_suspend(timer1);
+                running = 0;
+            }
+            else {
+                dispatch_resume(timer1);
+                running = 1;
+            }
         }
         else if(ch == 'h') {
             cursor_x = cursor_x == 0 ? 0 : cursor_x - 1;
@@ -159,8 +167,16 @@ int clk_main() {
             move(cursor_y, cursor_x);
         }
         else if(ch == 'x') {
-            notes[0][cursor_x] = !notes[0][cursor_x];
+            notes[cursor_y-3][cursor_x] = !notes[cursor_y-3][cursor_x];
             draw_grid(i%16);
+        }
+        else if(ch == 'k') {
+            cursor_y = cursor_y == 3 ? 3 : cursor_y - 1;
+            move(cursor_y, cursor_x);
+        }
+        else if(ch == 'j') {
+            cursor_y = cursor_y == tracks_len+2 ? tracks_len+2 : cursor_y + 1;
+            move(cursor_y, cursor_x);
         }
         refresh();
     }
