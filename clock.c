@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <ncurses.h>
 #include <rtmidi/rtmidi_c.h>
+#include "cseq.h"
+#include "array.c"
+
 
 RtMidiOutPtr out_ptr;
 unsigned char msg[3] = {0x90, 0x3c, 0x40};
@@ -15,6 +18,7 @@ int cursor_y = 3;
 int signature = 4; // quarter notes per beat
 int timer_reset = 0;
 int running = 0;
+Array events_array;
 dispatch_queue_t queue;
 dispatch_source_t timer1;
 
@@ -29,6 +33,37 @@ unsigned long long int bpm_to_usec(int bpm) {
     return (NSEC_PER_SEC * 60) / bpm;
 }
 
+void insert_event(Array* a, int start, int end, int chan) {
+    struct event* ev = malloc(sizeof(struct event));
+    ev->start = start;
+    ev->end = end;
+    ev->chan = chan;
+    insertArray(a, ev);
+}
+
+void init_array() {
+    Array a = events_array;
+    struct event* ev = malloc(sizeof(struct event));
+    struct event* ev2 = malloc(sizeof(struct event));
+    ev->start = 1;
+    ev->end = 2;
+    ev->chan = 0;
+    ev2->start = 2;
+    ev2->end = 3;
+    ev2->chan = 0;
+    initArray(&a, 5);  // initially 5 elements
+    insertArray(&a, ev);
+    insertArray(&a, ev2);
+    freeArray(&a);
+}
+
+struct event events[] = {
+    {.start = 1, .end = 3, .chan = 0},
+    {.start = 5, .end = 7, .chan = 0},
+    {.start = 13, .end = 14, .chan = 1}
+};
+int events_len = 3;
+
 int notes[][16] = {
     { 1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 },
     { 0,0,0,0, 1,0,0,0, 1,0,0,0, 0,0,0,0 },
@@ -38,6 +73,15 @@ int notes[][16] = {
 
 int tracks[] = {1,2,3,4};
 int tracks_len = 4;
+
+void draw_grid_sparse(int loc) {
+    int offset = 3;
+    for(int t = 0; t < events_len; t++) {
+        for(int j = 0; j < events[t].end - events[t].start; j++) {
+            mvaddch(offset+events[t].chan, events[t].start + j, 'x');
+        }
+    }
+}
 
 void draw_grid(int loc) {
     for(int t = 0; t < tracks_len; t++) {
@@ -105,8 +149,8 @@ void sigtrap(int sig)
 
 void vector1(dispatch_source_t timer)
 {
-        // printw("a: %d\n", i);
-        draw_grid(i%16);
+        // draw_grid(i%16);
+        draw_grid_sparse(i%16);
         refresh();
         i++;
 }
@@ -134,7 +178,8 @@ int clk_main() {
 
     // Set timer
     dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
-    draw_grid(0);
+    // draw_grid(0);
+    draw_grid_sparse(0);
 
     int ch;
     while(ch != KEY_F(2) && ch != 'q') {
@@ -168,7 +213,8 @@ int clk_main() {
         }
         else if(ch == 'x') {
             notes[cursor_y-3][cursor_x] = !notes[cursor_y-3][cursor_x];
-            draw_grid(i%16);
+            // draw_grid(i%16);
+            draw_grid_sparse(i%16);
         }
         else if(ch == 'k') {
             cursor_y = cursor_y == 3 ? 3 : cursor_y - 1;
