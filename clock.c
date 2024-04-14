@@ -12,6 +12,8 @@ unsigned char msg[3] = {0x90, 0x24, 0x7f};
 unsigned char msg_off[3] = {0x80, 0x24, 0x00};
 
 int i = 0;
+int tick = 0;
+int ticks_per_quarter = 24;
 int bpm = 120;
 int key = ' ';
 int cursor_x = 0;
@@ -28,6 +30,7 @@ void send_midi_note(int ch) {
   msg[0] = 0x90 + ch;
   int retval = rtmidi_out_send_message(out_ptr, msg , 3);
 }
+
 void send_midi_note_off(int ch) {
   msg_off[0] = 0x80 + ch;
   int retval = rtmidi_out_send_message(out_ptr, msg_off , 3);
@@ -94,15 +97,17 @@ void draw_grid_sparse(int loc) {
 }
 
 void draw_grid(int loc) {
+	/*
     for(int t = 0; t < tracks_len; t++) {
         if(notes[t][loc] != 0) {
             send_midi_note(t);
             send_midi_note_off(t);
         }
     }
+    */
     erase();
-    printw("bpm: %i step: %i\n", bpm, i%16);
-    printw("key: %c\n", key);
+    printw("bpm: %i step: %i tick: %i\n", bpm, i%16, tick);
+    printw("key: %c %i\n", key, key);
     printw("================\n");
     for(int k = 0; k < tracks_len; k++) {
         for(int j = 0; j < 16; j++) {
@@ -116,8 +121,8 @@ void draw_grid(int loc) {
     attroff(A_REVERSE);
     move(cursor_y, cursor_x);
     if(timer_reset != 0) {
-        dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, bpm_to_usec(bpm)/signature);
-        dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
+        dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
+        dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature/ticks_per_quarter, 0);
         timer_reset = 0;
     }
 }
@@ -165,12 +170,12 @@ void init_midi() {
 
 
 extern void init() {
-	initscr();
+    initscr();
     // curs_set(0);
     move(cursor_y, cursor_x);
-	raw();
-	keypad(stdscr, TRUE);
-	noecho();
+    raw();
+    keypad(stdscr, TRUE);
+    noecho();
     refresh();
 }
 
@@ -184,15 +189,24 @@ void sigtrap(int sig)
 
 void vector1(dispatch_source_t timer)
 {
-        draw_grid(i%16);
+    for(int t = 0; t < tracks_len; t++) {
+	if(notes[t][tick/ticks_per_quarter%16] != 0) {
+	    send_midi_note(t);
+	    send_midi_note_off(t);
+	}
+    }
         // draw_grid_sparse(i%16);
         refresh();
-        i++;
+        tick++;
+	if(tick % ticks_per_quarter == 0) {
+            draw_grid(i%16);
+            i++;
+	}
 }
 
 int clk_main() {
     init();
-    // signal(SIGINT, &sigtrap);   //catch the cntl-c
+    signal(SIGINT, &sigtrap);   //catch the cntl-c
     queue = dispatch_queue_create("timerQueue", 0);
 
     // Create dispatch timer source
@@ -212,7 +226,7 @@ int clk_main() {
     dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, 0);
 
     // Set timer
-    dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
+    dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature/ticks_per_quarter, 0);
     draw_grid(0);
     // draw_grid_sparse(0);
 
@@ -227,9 +241,17 @@ int clk_main() {
             timer_reset = 1;
             draw_grid(i%16);
         }
+	// left arrow, nudge tempo
+	else if(ch == 260) {
+            draw_grid(i%16);
+        }
         else if(ch == '+') {
             bpm++;
             timer_reset = 1;
+            draw_grid(i%16);
+        }
+	// right arrow, nudge tempo
+	else if(ch == 261) {
             draw_grid(i%16);
         }
         else if(ch == 'g' && ch2 == 'g') {
@@ -273,6 +295,9 @@ int clk_main() {
             cursor_y = cursor_y == tracks_len+2 ? tracks_len+2 : cursor_y + 1;
             move(cursor_y, cursor_x);
         }
+	else {
+            draw_grid(i%16);
+	}
         refresh();
     }
     endwin();
