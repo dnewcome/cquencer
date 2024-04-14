@@ -174,8 +174,8 @@ void sigtrap(int sig)
 
 void vector1(dispatch_source_t timer)
 {
-        // draw_grid(i%16);
-        draw_grid_sparse(i%16);
+        draw_grid(i%16);
+        // draw_grid_sparse(i%16);
         refresh();
         i++;
 }
@@ -203,8 +203,8 @@ int clk_main() {
 
     // Set timer
     dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
-    // draw_grid(0);
-    draw_grid_sparse(0);
+    draw_grid(0);
+    // draw_grid_sparse(0);
 
     int ch = 0;
     int ch2 = 0;
@@ -247,8 +247,8 @@ int clk_main() {
         }
         else if(ch == 'x') {
             notes[cursor_y-3][cursor_x] = !notes[cursor_y-3][cursor_x];
-            // draw_grid(i%16);
-            draw_grid_sparse(i%16);
+            draw_grid(i%16);
+            // draw_grid_sparse(i%16);
         }
         else if(ch == 'k') {
             cursor_y = cursor_y == 3 ? 3 : cursor_y - 1;
