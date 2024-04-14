@@ -10,6 +10,7 @@
 RtMidiOutPtr out_ptr;
 unsigned char msg[3] = {0x90, 0x24, 0x7f};
 unsigned char msg_off[3] = {0x80, 0x24, 0x00};
+
 int i = 0;
 int bpm = 120;
 int key = ' ';
@@ -22,10 +23,13 @@ Array events_array;
 dispatch_queue_t queue;
 dispatch_source_t timer1;
 
-void send_midi_note() {
+void send_midi_note(int ch) {
+  //int retval = rtmidi_out_send_message(out_ptr, msg , 3);
+  msg[0] = 0x90 + ch;
   int retval = rtmidi_out_send_message(out_ptr, msg , 3);
 }
-void send_midi_note_off() {
+void send_midi_note_off(int ch) {
+  msg_off[0] = 0x80 + ch;
   int retval = rtmidi_out_send_message(out_ptr, msg_off , 3);
 }
 
@@ -65,11 +69,17 @@ struct event events[] = {
 int events_len = 3;
 
 int notes[][16] = {
-    { 1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 },
+    { 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0 },
     { 0,0,0,0, 1,0,0,0, 1,0,0,0, 0,0,0,0 },
     { 0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0 },
     { 0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0 }
 };
+
+void clear_track(int n) {
+    for(int ij = 0; ij < 16; ij++) {
+        notes[n][ij] = 0;
+    }
+}
 
 int tracks[] = {1,2,3,4};
 int tracks_len = 4;
@@ -86,12 +96,12 @@ void draw_grid_sparse(int loc) {
 void draw_grid(int loc) {
     for(int t = 0; t < tracks_len; t++) {
         if(notes[t][loc] != 0) {
-            send_midi_note();
-            send_midi_note_off();
+            send_midi_note(t);
+            send_midi_note_off(t);
         }
     }
     erase();
-    printw("bpm: %i\n", bpm);
+    printw("bpm: %i step: %i\n", bpm, i%16);
     printw("key: %c\n", key);
     printw("================\n");
     for(int k = 0; k < tracks_len; k++) {
@@ -224,6 +234,11 @@ int clk_main() {
         }
         else if(ch == 'g' && ch2 == 'g') {
 	    i = 0;
+            // timer_reset = 1;
+            draw_grid(i%16);
+        }
+        else if(ch == 'd' && ch2 == 'd') {
+	    clear_track(cursor_y-3);
             // timer_reset = 1;
             draw_grid(i%16);
         }
