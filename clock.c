@@ -5,11 +5,11 @@
 #include <rtmidi/rtmidi_c.h>
 
 RtMidiOutPtr out_ptr;
-unsigned char msg[3] = {0x90, 0x3c, 0x40};
-unsigned char msg_off[3] = {0x80, 0x3c, 0x00};
+unsigned char msg[3] = {0x90, 0x24, 0x7f};
+unsigned char msg_off[3] = {0x80, 0x24, 0x00};
 int i = 0;
-int bpm = 60;
-int key = '-';
+int bpm = 120;
+int key = ' ';
 int cursor_x = 0;
 int cursor_y = 3;
 int signature = 4; // quarter notes per beat
@@ -68,7 +68,30 @@ void draw_grid(int loc) {
     }
 }
 
+void list_midi_ports() {
+  char* buf = (char*)malloc(128*sizeof(char));
+
+  // enumerate the available apis.. could be core, alsa, jack, etc
+  int num_apis = rtmidi_get_compiled_api(NULL, 0);
+  printf("we have %i apis\n", num_apis);
+  enum RtMidiApi* apis = malloc(num_apis * sizeof(enum RtMidiApi));
+  rtmidi_get_compiled_api(apis, num_apis);
+  // name of first api is `core' on osx
+  for(int api_num = 0; api_num < num_apis; api_num++) {
+      printf("api %i name is %s\n", api_num, rtmidi_api_name(apis[api_num]));
+  }
+
+  out_ptr = rtmidi_out_create(apis[0], "test");
+  unsigned int num_ports = rtmidi_get_port_count(out_ptr);
+  for(int port_num = 0; port_num < num_ports; port_num++) {
+      rtmidi_get_port_name(out_ptr, port_num, buf, &((int){128}));
+      printf("port %i name is %s\n", port_num, buf);
+  }
+}
+
 void init_midi() {
+  list_midi_ports();
+  char* buf =  (char*)malloc(128*sizeof(char));
   // enumerate the available apis.. could be core, alsa, jack, etc
   int num_apis = rtmidi_get_compiled_api(NULL, 0);
   printf("we have %i apis\n", num_apis);
@@ -81,7 +104,9 @@ void init_midi() {
   out_ptr = rtmidi_out_create(apis[0], "test");
   unsigned int num_ports = rtmidi_get_port_count(out_ptr);
   printf("we have %i ports\n", num_ports);
-  rtmidi_open_port(out_ptr, 0, "Bus 1");
+  rtmidi_get_port_name(out_ptr, 0, buf, &((int){128}));
+  printf("port name for %i is %s \n", 0, buf);
+  rtmidi_open_port(out_ptr, 4, "Bus 1");
 }
 
 
@@ -136,17 +161,26 @@ int clk_main() {
     dispatch_source_set_timer(timer1, start, bpm_to_usec(bpm)/signature, 0);
     draw_grid(0);
 
-    int ch;
+    int ch = 0;
+    int ch2 = 0;
     while(ch != KEY_F(2) && ch != 'q') {
+        ch2 = ch;
         ch = getch();
         key = ch;
         if(ch == '-') {
             bpm--;
             timer_reset = 1;
+            draw_grid(i%16);
         }
         else if(ch == '+') {
             bpm++;
             timer_reset = 1;
+            draw_grid(i%16);
+        }
+        else if(ch == 'g' && ch2 == 'g') {
+	    i = 0;
+            // timer_reset = 1;
+            draw_grid(i%16);
         }
         else if(ch == ' ') {
             if(running) {
